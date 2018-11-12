@@ -13,7 +13,7 @@ __ENH_DEF_LOGFILE_COUNT__ = 8
 __ENH_DEF_LOGLEVEL__ = logging.INFO
 __ENH_MIN_PAYLOADS_LENGTH__ = 36
 __ENH_DEF_PAYLOADS_LENGTH__ = 64
-__ENH_DATETIME_FORMAT__ = '[%Y-%m-%dT%H:%M:%S.%f%zZ]'
+__ENH_DATETIME_FORMAT__ = '[%Y-%m-%dT%H:%M:%S.%f%zZ] '
 __ENH_MAX_RECEIVE_BUFFER__ = 8192
 
 __ENH_DESCRIPTION__ = 'A python ping/traceroute(not implement) utils covers TCP, UDP, ICMP tool test. Current Version:' + __ENH_CLASS_VERSION__
@@ -22,24 +22,22 @@ __ENH_EPILOG__ = """Example
     UDP:    not implement
     TCP:    not implement
     """
+def exception_string(e):
+    return (e.args if e.args else tuple()) + ((traceback.format_exc()),)
 
 class _ENH_BASE():
     @staticmethod
     def version():
         return __ENH_CLASS_NAME__ + ' ' + __ENH_CLASS_VERSION__
 
-    def current_time(self):
-        return datetime.fromtimestamp(time.time()).strftime(__ENH_DATETIME_FORMAT__)
+    def current_time(self,format_time=__ENH_DATETIME_FORMAT__):
+        return datetime.fromtimestamp(time.time()).strftime(format_time)
 
     def default_timer(self):
         #__ENH_DEF_TIMER__ = time.perf_counter if __ENH_IS_WIN32__ else time.time
         if __ENH_IS_WIN32__:
             return time.perf_counter()
         return time.time()
-
-    @staticmethod
-    def except_string(e):
-        return (e.args if e.args else tuple()) + ((traceback.format_exc()),)
 
 class _IP_PACKET:
     def __init__(self, ver):
@@ -58,10 +56,6 @@ class _IP_PACKET:
         s = ~s & 0xffff
         return s
     
-    @staticmethod
-    def except_string(e):
-        return (e.args if e.args else tuple()) + ((traceback.format_exc()),)
-
 class _IPV4_PACKET(_IP_PACKET):
     _IP_VERSION = 4
     _IP_DEF_TTL = 50
@@ -210,7 +204,7 @@ class _IPV4_PACKET(_IP_PACKET):
             __ip4.raw_packet = packet
             return __ip4
         except Exception as e:
-            raise _IPV4_PACKET.except_string(e)
+            raise exception_string(e)
             #raise
         return None
 
@@ -280,13 +274,14 @@ class _ICMPV4_PACKET(_IP_PACKET):
             # __ENH_DEBUG_LOG__("Exception occurred: " + str(e))
             # __ENH_DEBUG_LOG__(traceback.format_exc())
             # raise
-            raise _ICMPV4_PACKET.except_string(e)
+            raise exception_string(e)
             #raise
         return None		
 
 class _ENH_PACKET(_ENH_BASE):
     _PAYLOAD_START_VAL = 0x42
     _MAGIC_NUMMBER = 0xCCEEEECC
+
     @staticmethod
     def raw_data(length):
         """
@@ -345,7 +340,7 @@ class _ENH_PACKET(_ENH_BASE):
         except Exception as e:
             #__ENH_DEBUG_LOG__("type error: " + str(e))
             #__ENH_DEBUG_LOG__(traceback.format_exc())
-            raise _ENH_PACKET.except_string(e)
+            raise exception_string(e)
             #raise
         return None
 
@@ -480,24 +475,10 @@ class _ENH_STATISTICS:
         self.measure["lost_rate"] = self.measure["lost"]*100/self.measure["transmitted"] 
         if(self.measure["delay_received"]>0):
             self.measure["avg_delay"] = self.measure["overall_delay"]/self.measure["delay_received"]
-            self.measure["app_avg"] = self.measure["app_total"]/self.measure["delay_received"]
+            #self.measure["app_avg"] = self.measure["app_total"]/self.measure["delay_received"]
         else:
-            self.measure["ping_delay"] = self.measure["min_delay"] = self.measure["max_delay"] = 0
-            self.measure["avg_delay"] = self.measure["app_avg"] = self.measure["overall_delay"] = 0
+            self.measure["ping_delay"] = self.measure["min_delay"] = self.measure["max_delay"] = self.measure["overall_delay"] = self.measure["avg_delay"] = 0
         return self.measure
-from enhlib.structure import _ICMPV4_PACKET, _IPV4_PACKET
-from enhlib.baseclass import _ENH_PING, _ENH_PACKET
-from enhlib.statistics import _ENH_STATISTICS
-
-import os, sys, socket, struct, select, time, logging, logging.handlers, signal, traceback
-from datetime import datetime
-
-__ENH_CLASS_VERSION__ = '1.0.1'
-__ENH_IS_WIN32__ = ("win32"==sys.platform)
-__ENH_CLASS_NAME__ = "ENH_PING"
-__ENH_DATETIME_FORMAT__ = '[%Y-%m-%dT%H:%M:%S.%f%zZ] '
-__ENH_MAX_RECEIVE_BUFFER__ = 8192
-__ENH_DEF_PAYLOAD_LENGTH__ = 64
 
 class _ENH_ICMPV4_PING(_ENH_PING):
     _PROTOCOL_NUM = socket.IPPROTO_ICMP
@@ -510,7 +491,7 @@ class _ENH_ICMPV4_PING(_ENH_PING):
         super().__init__(dst,src,src_port,dst_port,timeout,interval,count,logflag,loglevel)
         #icmp = socket.getprotobyname("icmp")
         if(payloads_len<=0 or payloads_len>=__ENH_MAX_RECEIVE_BUFFER__):            #do want to handle too much payloads
-            self.payloads_len = __ENH_DEF_PAYLOAD_LENGTH__ - 8
+            self.payloads_len = __ENH_DEF_PAYLOADS_LENGTH__ - 8
         else:
             self.payloads_len = payloads_len - 8
         self.sequence = sequence if sequence>0 else 1
@@ -570,7 +551,7 @@ class _ENH_ICMPV4_PING(_ENH_PING):
         footer_string = """
 ====== {protocal_name} {0} {dst} statistics ======
 {transmitted} packets transmitted, {received} packets received, {lost}({lost_rate:.2f}%) packets dropped.
-min/avg/max/app = {min_delay:.4f}/{avg_delay:.4f}/{max_delay:.4f}/{app_avg:.4f} ms
+min/avg/max = {min_delay:.4f}/{avg_delay:.4f}/{max_delay:.4f} ms
 """
         self.hLogging.info(footer_string.format(__ENH_CLASS_NAME__,**self.icmp_status.statistics()))
         return icount
@@ -624,7 +605,7 @@ min/avg/max/app = {min_delay:.4f}/{avg_delay:.4f}/{max_delay:.4f}/{app_avg:.4f} 
                 # Filters out the echo request itself.
                 # This can be tested by pinging 127.0.0.1
                 # You'll see your own request
-                app_time += self.default_timer() - select_start
+                #app_time += self.default_timer() - select_start
                 if icmpv4_packet.icmp_type != 8 and icmpv4_packet.id == self.id:    #type=0 echo reply, #type=? destination unreachable
                     self.icmp_status.put("reachable", 1)
                     enh_packet = _ENH_PACKET.unpack(icmpv4_packet.payloads)         #parse my own packet structure and data
@@ -638,7 +619,8 @@ min/avg/max/app = {min_delay:.4f}/{avg_delay:.4f}/{max_delay:.4f}/{app_avg:.4f} 
                     #caculate the delay and cost
                     ping_delay = (self.icmp_status.get("resp_received") - self.icmp_status.get("req_sent"))*1000
                     self.icmp_status.save_delay(ping_delay)
-                    app_time += self.icmp_status.get("req_sent") - self.icmp_status.get("req_create")
+                    #app_time += self.icmp_status.get("req_sent") - self.icmp_status.get("req_create")
+                    #app_time = app_time*1000 - ping_delay
                     #self.icmp_status.put("app_cost", app_time)
                     self.icmp_status.add("app_total",app_time)
                     #self.icmp_status.add("socket_cost",socket_time)
@@ -659,8 +641,8 @@ min/avg/max/app = {min_delay:.4f}/{avg_delay:.4f}/{max_delay:.4f}/{app_avg:.4f} 
                     #     )
 
                     return 1
-                #time_left = time_left - app_time         #in case it is not a response, and we still have time slot
-                if (time_left - app_time <= 0):
+                time_left = time_left + select_start - self.default_timer()         #in case it is not a response, and we still have time slot
+                if (time_left<= 0):
                     break
             except Exception as e:
                 self.hLogging.debug(traceback.format_exc())
@@ -668,7 +650,7 @@ min/avg/max/app = {min_delay:.4f}/{avg_delay:.4f}/{max_delay:.4f}/{app_avg:.4f} 
                 return -1
 #        self.icmp_status.put("reachable", 0)
         self.icmp_status.add("timeout")
-        timeout_string = "{0} Request timed out. app_time={1}".format(self.current_time(),app_time)
+        timeout_string = "{0}Request timed out.".format(self.current_time(self.format_timestamp) if self.print_timestamp else '')
         self.hLogging.info(timeout_string)
         return 0
 
